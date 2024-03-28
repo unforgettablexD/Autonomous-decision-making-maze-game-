@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from multi_armed_bandits import *
+from collections import deque
 
 
 
@@ -202,17 +203,38 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
         action_values = [q_values[a] for a in range(self.nr_actions)]
         return epsilon_greedy(action_values, None, epsilon=self.epsilon)
 
+
     def initialize_q_values(self, env):
-        max_distance = env.width + env.height
+        max_distance = env.width + env.height  # Used for fallback heuristic calculation
         goal_x, goal_y = env.goal_position
         negative_reward = -1  # Penalty for hitting a wall or obstacle
+        obstacles = set(env.obstacles)
+
+        def bfs_distance(start):
+            """Returns the BFS distance to the goal from start, considering obstacles."""
+            if start == (goal_x, goal_y):
+                return 0
+            visited = set([start])
+            queue = deque([(start, 0)])  # Each item is (position, distance)
+            while queue:
+                (x, y), dist = queue.popleft()
+                for dx, dy in [(0, 1), (1, 0), (-1, 0), (0, -1)]:  # 4 directions: N, E, S, W
+                    next_pos = (x + dx, y + dy)
+                    if next_pos not in visited and next_pos not in obstacles:
+                        if next_pos == (goal_x, goal_y):
+                            return dist + 1
+                        if self.is_within_bounds(next_pos, env):
+                            visited.add(next_pos)
+                            queue.append((next_pos, dist + 1))
+            return max_distance  # Fallback if no path is found
 
         for x in range(env.width):
             for y in range(env.height):
                 state = np.array([x, y])
                 state_str = np.array2string(state)
+                distance = bfs_distance((x, y))
 
-                distance = abs(x - goal_x) + abs(y - goal_y)
+                # Calculate heuristic value based on BFS distance
                 heuristic_value = (max_distance - distance) / max_distance
 
                 # Check for strategic positioning between obstacles
@@ -225,8 +247,9 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
                     if next_pos in env.obstacles or not self.is_within_bounds(next_pos, env):
                         self.Q_values[(state_str, action)] = negative_reward
                     else:
-                        # Set Q-value based on whether the position is strategic and its distance to the goal
+                        # Set Q-value based on BFS distance to the goal and strategic positioning
                         self.Q_values[(state_str, action)] = strategic_value
+
 
     def is_strategic_position(self, x, y, env):
         """Check if there are obstacles in opposite cardinal directions."""
@@ -243,6 +266,7 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
         east_west_opposites = east and west
 
         return north_south_opposites or east_west_opposites
+        # return False
 
     def predict_next_position(self, x, y, action, env):
         if action == MOVE_NORTH:

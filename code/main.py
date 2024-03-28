@@ -9,7 +9,7 @@ def episode(env, agent, nr_episode=0):
     # print(env.obstacles)
     # return
     discounted_return = 0
-    discount_factor = 0.99
+    discount_factor = 0.997
     done = False
     time_step = 0
     while not done:
@@ -31,7 +31,7 @@ rooms_instance = sys.argv[1]
 env = rooms.load_env(f"layouts/{rooms_instance}.txt", f"{rooms_instance}.mp4")
 params["nr_actions"] = env.action_space.n
 params["gamma"] = 0.99
-params["epsilon_decay"] = 0.001
+params["epsilon_decay"] = 0.0001
 params["alpha"] = 0.1
 params["env"] = env
 
@@ -42,7 +42,7 @@ params['lambda'] = 0.8  # Or another value you wish to use
 agent = a.TDLambdaLearner(params)
 
 #agent = a.TDLambdaLearner(params)
-training_episodes = 200
+training_episodes = 600
 returns = [episode(env, agent, i) for i in range(training_episodes)]
 
 graph_data = {

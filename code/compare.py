@@ -48,21 +48,21 @@ def main():
             agents_returns = json.load(file)
     else:
         # Initialize the environment
-        rooms_instance = "medium_1"
+        rooms_instance = "hard_0"
         env = rooms.load_env(f"layouts/{rooms_instance}.txt", f"{rooms_instance}.mp4")
 
         # Initialize common parameters, including 'env'
         params = {
             "nr_actions": env.action_space.n,
             "gamma": 0.99,
-            "epsilon_decay": 0.001,
+            "epsilon_decay": 0.0001,
             "alpha": 0.1,
             "env": env,
             "lambda": 0.8,  # For TDLambdaLearner
         }
 
         # Define the number of episodes for training
-        training_episodes = 200
+        training_episodes = 600
 
         # List of agent classes to compare
         agent_classes = [
