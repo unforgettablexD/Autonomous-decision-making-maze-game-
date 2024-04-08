@@ -42,7 +42,7 @@ def smooth_data(data, window_width):
 
 def main():
     # Check if the data file exists to avoid re-running the experiments
-    data_filename = 'agent_performance_data.json'
+    data_filename = 'agent_performance_data_medium1.json'
     if os.path.exists(data_filename):
         with open(data_filename, 'r') as file:
             agents_returns = json.load(file)
