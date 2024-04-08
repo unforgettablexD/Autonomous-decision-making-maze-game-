@@ -59,5 +59,11 @@ https://github.com/unforgettablexD/Autonomous-decision-making-maze-game-/assets/
 cd code
 python compare.py <map-name>
 ```
-
+### Simple TDLambda
 ![smoothed_agent_performance_comparison](https://github.com/unforgettablexD/Autonomous-decision-making-maze-game-/assets/49744841/1a9e841a-6797-4dc6-9746-30398aaf117d)
+
+
+### Modified TDLambda
+![combined_agent_performance](https://github.com/unforgettablexD/Autonomous-decision-making-maze-game-/assets/49744841/2351c06b-1a05-4dc4-a8cd-996cd279509d)
+
+
