@@ -69,7 +69,7 @@ python test.py hard_0
 You may replace `hard_0` with any other map, however, ensure that the pickle file used opens and agent trained on the same map.
 
 The `test.py` file tests our agent on every occupiable position of the map. It also tests the agent on 10 random positions as specified as the testing requirements in class.
-```
+
 
 ## results
 
