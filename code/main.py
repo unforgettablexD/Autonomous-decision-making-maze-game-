@@ -46,7 +46,7 @@ params["env"] = env
 params['lambda'] = 0.8  # Or another value you wish to use
 agent = a.TDLambdaLearner(params)
 
-training_episodes = 600
+training_episodes = 2000
 returns = [episode(env, agent,None, i) for i in range(training_episodes)]
 x = range(training_episodes)
 y = returns
