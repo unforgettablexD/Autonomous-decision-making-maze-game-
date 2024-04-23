@@ -2,9 +2,7 @@ import random
 import numpy as np
 from multi_armed_bandits import *
 from collections import deque
-from copy import deepcopy
-
-
+from rooms import *
 
 
 MOVE_NORTH = 0
@@ -105,17 +103,20 @@ class QLearner(TemporalDifferenceLearningAgent):
         self.Q(state)[action] += self.alpha*TD_error
 
 
-import numpy as np
-from agent import TemporalDifferenceLearningAgent, epsilon_greedy
-
 class TDLambdaLearner(TemporalDifferenceLearningAgent):
     def __init__(self, params):
         super().__init__(params)
         self.lambda_ = params.get('lambda', 0.8)  # Default λ value is 0.8
-       # self.eligibility_traces = {}
         # Initialize eligibility traces
         self.eligibility_traces = {}
         self.initialize_q_values(params['env'])
+        self.env = params['env']
+
+    def test_mode(self):
+        """
+        Sets epsilon to 0 for testing
+        """
+        self.epsilon = 0 
 
     def Q(self, state, action=None):
         """
@@ -153,13 +154,27 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
     def decay_eligibility_traces(self):
         """
         Decays all eligibility traces by multiplying them with gamma * lambda.
-        This method is typically called after each step in the episode.
+        This method is called after each step in the episode.
         """
         for key in list(self.eligibility_traces.keys()):
             self.eligibility_traces[key] *= self.gamma * self.lambda_
 
     def update(self, state, action, reward, next_state, terminated, truncated):
-        # Decay exploration as usual
+        """
+        Updates the agent's knowledge based on the received experience tuple (state, action, reward, next_state)
+        and the termination status of the episode. This function uses temporal difference (TD) learning
+        combined with eligibility traces to update Q-values and adjusts exploration behavior.
+
+        Parameters:
+        - state (np.ndarray): The current state of the environment.
+        - action (int): The action taken in the current state.
+        - reward (float): The reward received after taking the action.
+        - next_state (np.ndarray): The state of the environment after the action is taken.
+        - terminated (bool): A flag indicating if the episode has ended due to the agent reaching a terminal state.
+        - truncated (bool): A flag indicating if the episode has ended due to reaching a time limit.
+        """
+
+        # Decay exploration 
         self.decay_exploration()
 
         # Convert state to string for consistency
@@ -172,7 +187,6 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
         self.decay_eligibility_traces()
 
         # Determine best next action's Q-value for updating (in Q-Learning style)
-        #max_next_q = max(self.Q(next_state_str).values())
         max_next_q = max(self.Q(next_state).values())
 
         # TD target with bootstrapping from next state
@@ -193,23 +207,48 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
             self.reset_eligibility_traces()
 
     def reset_eligibility_traces(self):
+        """
+        Resets the eligibilty trace dictionary 
+        """
         self.eligibility_traces = {}
 
     def decay_exploration(self):
+        """
+        Decays epsilon value to reduce exploration 
+        """
         # Decay the epsilon value for ε-greedy policy
-        self.epsilon = max(self.epsilon - self.epsilon_decay, 0.01)
+        self.epsilon = max(self.epsilon - self.epsilon_decay, 0.001)
 
     def policy(self, state):
+        """
+        Returns action based on the learnt policy. The policy also uses epsilon greedy to balance exploration and exploitation
+        
+        Parameters:
+        - state (np.ndarray): The current state of the environment.
+        
+        """
         # Select action based on epsilon-greedy policy
         q_values = self.Q(state)
         action_values = [q_values[a] for a in range(self.nr_actions)]
         return epsilon_greedy(action_values, None, epsilon=self.epsilon)
 
-
     def initialize_q_values(self, env):
+        """
+        Initializes the Q-values for all state-action pairs based on a heuristic derived from the
+        Breadth-First Search (BFS) distance to the goal state, adjusted for obstacles.
+
+        This method computes the heuristic Q-value for each state by considering the shortest path
+        to the goal that avoids obstacles. The heuristic is inversely proportional to the BFS distance,
+        so that states closer to the goal have higher heuristic values.
+
+        Parameters:
+        - env (gym.Env): The environment instance which provides the grid dimensions,
+        the locations of obstacles, and the goal position.
+      """
+
         max_distance = env.width + env.height  # Used for fallback heuristic calculation
         goal_x, goal_y = env.goal_position
-        negative_reward = -1  # Penalty for hitting a wall or obstacle
+        obstacle_value = -1  # Value for a wall or obstacle
         obstacles = set(env.obstacles)
 
         def bfs_distance(start):
@@ -237,40 +276,28 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
                 distance = bfs_distance((x, y))
 
                 # Calculate heuristic value based on BFS distance
-                heuristic_value = (max_distance - distance) / max_distance
-
-                # Check for strategic positioning between obstacles
-                strategic_position = self.is_strategic_position(x, y, env)
-                strategic_value = (max_distance - distance) / max_distance if strategic_position else heuristic_value
+                heuristic_value = (max_distance - distance) / max_distance                
 
                 for action in range(env.action_space.n):
                     next_pos = self.predict_next_position(x, y, action, env)
-
                     if next_pos in env.obstacles or not self.is_within_bounds(next_pos, env):
-                        self.Q_values[(state_str, action)] = negative_reward
+                        # Set Q-value to -1 if the ensuing state is an obstacle
+                        self.Q_values[(state_str, action)] = obstacle_value
                     else:
                         # Set Q-value based on BFS distance to the goal and strategic positioning
-                        self.Q_values[(state_str, action)] = strategic_value
+                        self.Q_values[(state_str, action)] = heuristic_value
 
 
-    def is_strategic_position(self, x, y, env):
-        """Check if there are obstacles in opposite cardinal directions."""
-        obstacles = set(env.obstacles)  # Assuming env.obstacles is a list or similar iterable
-
-        # Check for obstacles in all four cardinal directions
-        north = (x, y - 1) in obstacles
-        south = (x, y + 1) in obstacles
-        east = (x + 1, y) in obstacles
-        west = (x - 1, y) in obstacles
-
-        # Check for opposite pairs
-        north_south_opposites = north and south
-        east_west_opposites = east and west
-
-        return north_south_opposites or east_west_opposites
-        # return False
 
     def predict_next_position(self, x, y, action, env):
+        """
+        Predicts the next position of the agent given its current state and action
+
+        Parameters: 
+        - x : Current x coordinate of the agent 
+        - y : Current y coordinate of the agent
+        - action : Action to be taken
+        """
         if action == MOVE_NORTH:
             return (x, y - 1)
         elif action == MOVE_SOUTH:
@@ -279,90 +306,15 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
             return (x - 1, y)
         elif action == MOVE_EAST:
             return (x + 1, y)
-        # Add more actions if your environment requires
         return (x, y)  # Return the same position if action is unrecognized
 
     def is_within_bounds(self, position, env):
+        """
+        Determines if the current position of the agent is within bounds of a given environment
+
+        Parameter: 
+        - position : an (x,y) tuple that denotes an agents position in the environment
+        - env : Environment under consideration 
+        """
         x, y = position
         return 0 <= x < env.width and 0 <= y < env.height
-
-
-
-class PolicyGradientAgent(Agent):
-    def __init__(self, params):
-        super().__init__(params)
-        self.theta = np.random.rand(self.nr_actions)  # Parameter for policy
-        self.alpha = params['alpha']  # Learning rate
-
-    def policy(self, state):
-        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
-        return np.random.choice(self.nr_actions, p=probs)
-
-    def update(self, state, action, reward, next_state, terminated, truncated):
-        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
-        self.theta -= self.alpha * (reward * (1 - probs[action]))
-
-class REINFORCEAgent(PolicyGradientAgent):
-    def __init__(self, params, baseline=False):
-        super().__init__(params)
-        self.baseline = baseline
-        self.reward_history = []
-
-    def update(self, state, action, reward, next_state, terminated, truncated):
-        baseline_value = np.mean(self.reward_history) if self.baseline else 0
-        self.reward_history.append(reward)
-        advantage = reward - baseline_value
-        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
-        self.theta += self.alpha * (advantage * (1 - probs[action]))
-
-
-class ActorCriticAgent(Agent):
-    def __init__(self, params):
-        super().__init__(params)
-        self.Q = np.zeros((self.nr_actions))  # Initialize Q-values for each action
-        self.policy_params = np.random.rand(self.nr_actions)  # Randomly initialize policy parameters
-        self.gamma = params['gamma']  # Discount factor
-        self.alpha = params['alpha']  # Learning rate for both actor and critic
-
-    def policy(self, state):
-        probs = np.exp(self.policy_params) / np.sum(np.exp(self.policy_params))
-        return np.random.choice(self.nr_actions, p=probs)
-
-    def update(self, state, action, reward, next_state, terminated, truncated):
-        next_action = self.policy(next_state)
-        td_error = reward + self.gamma * self.Q[next_action] - self.Q[action]
-        self.Q[action] += self.alpha * td_error
-        self.policy_params[action] += self.alpha * td_error  # Update policy parameters using the td_error
-
-
-
-class TDActorCriticAgent(ActorCriticAgent):
-    def update(self, state, action, reward, next_state, terminated, truncated):
-        next_action = self.policy(next_state)
-        td_target = reward if terminated else reward + self.gamma * self.Q[next_action]
-        td_error = td_target - self.Q[action]
-        self.Q[action] += self.alpha * td_error
-        self.policy_params[action] += self.alpha * td_error  # Policy update
-
-
-class TDLambdaActorCriticAgent(TDActorCriticAgent):
-    def __init__(self, params):
-        super().__init__(params)
-        self.lambda_ = params['lambda']  # Eligibility trace decay factor
-        self.eligibility_traces = np.zeros(self.nr_actions)  # Eligibility traces for each action
-
-    def update(self, state, action, reward, next_state, terminated, truncated):
-        self.eligibility_traces *= self.gamma * self.lambda_
-        self.eligibility_traces[action] += 1
-
-        next_action = self.policy(next_state)
-        td_target = reward if terminated else reward + self.gamma * self.Q[next_action]
-        td_error = td_target - self.Q[action]
-
-        self.Q += self.alpha * td_error * self.eligibility_traces
-        self.policy_params += self.alpha * td_error * self.eligibility_traces
-
-        if terminated:
-            self.eligibility_traces.fill(0)  # Reset traces at the end of the episode
-
-

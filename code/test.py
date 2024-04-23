@@ -36,31 +36,20 @@ rooms_instance = sys.argv[1]
 env = rooms.load_env(f"layouts/{rooms_instance}.txt", f"{rooms_instance}.mp4")
 params["nr_actions"] = env.action_space.n
 params["gamma"] = 0.99
-params["epsilon_decay"] = 0.000025
-params["alpha"] = 0.2
+params["epsilon_decay"] = 0.00005
+params["alpha"] = 0.1
 params["env"] = env
-
-#agent = a.RandomAgent(params)
-#agent = a.SARSALearner(params)
-#agent = a.QLearner(params)
 params['lambda'] = 0.8  # Or another value you wish to use
-agent = a.TDLambdaLearner(params)
 
-training_episodes = 600
-returns = [episode(env, agent,None, i) for i in range(training_episodes)]
-x = range(training_episodes)
-y = returns
+with open('agent.pkl' , 'rb') as file: 
+    agent = pickle.load(file)
 
-#Save the agent so that he (she? / they/them?) can be reused
-# with open('agent.pkl' , 'wb') as file: 
-#     pickle.dump(agent , file)
+agent.test_mode()
+
+# This line performs evaluation for all single occupiable position in the gridworld
+testing_return = [episode(env , agent ,pos, i) for i,pos in enumerate(env.occupiable_positions)]
+
+print('Random Testing')
+random_testing = [episode(env , agent ,None, i) for i in range(10)]
 
 
-plot.plot(x,y)
-plot.title("Progress")
-plot.xlabel("Episode")
-plot.ylabel("Discounted Return")
-plot.savefig("agent1_progress.png")
-plot.show()
-
-# env.save_video()
