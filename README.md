@@ -71,7 +71,7 @@ You may replace `hard_0` with any other map, however, ensure that the pickle fil
 The `test.py` file tests our agent on every occupiable position of the map. It also tests the agent on 10 random positions as specified as the testing requirements in class.
 
 
-## results
+## Results
 
 Easy_1 map:
 
