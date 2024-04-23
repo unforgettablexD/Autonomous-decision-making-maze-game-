@@ -2,6 +2,8 @@ import random
 import numpy as np
 from multi_armed_bandits import *
 from collections import deque
+from copy import deepcopy
+
 
 
 
@@ -283,3 +285,84 @@ class TDLambdaLearner(TemporalDifferenceLearningAgent):
     def is_within_bounds(self, position, env):
         x, y = position
         return 0 <= x < env.width and 0 <= y < env.height
+
+
+
+class PolicyGradientAgent(Agent):
+    def __init__(self, params):
+        super().__init__(params)
+        self.theta = np.random.rand(self.nr_actions)  # Parameter for policy
+        self.alpha = params['alpha']  # Learning rate
+
+    def policy(self, state):
+        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
+        return np.random.choice(self.nr_actions, p=probs)
+
+    def update(self, state, action, reward, next_state, terminated, truncated):
+        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
+        self.theta -= self.alpha * (reward * (1 - probs[action]))
+
+class REINFORCEAgent(PolicyGradientAgent):
+    def __init__(self, params, baseline=False):
+        super().__init__(params)
+        self.baseline = baseline
+        self.reward_history = []
+
+    def update(self, state, action, reward, next_state, terminated, truncated):
+        baseline_value = np.mean(self.reward_history) if self.baseline else 0
+        self.reward_history.append(reward)
+        advantage = reward - baseline_value
+        probs = np.exp(self.theta) / np.sum(np.exp(self.theta))
+        self.theta += self.alpha * (advantage * (1 - probs[action]))
+
+
+class ActorCriticAgent(Agent):
+    def __init__(self, params):
+        super().__init__(params)
+        self.Q = np.zeros((self.nr_actions))  # Initialize Q-values for each action
+        self.policy_params = np.random.rand(self.nr_actions)  # Randomly initialize policy parameters
+        self.gamma = params['gamma']  # Discount factor
+        self.alpha = params['alpha']  # Learning rate for both actor and critic
+
+    def policy(self, state):
+        probs = np.exp(self.policy_params) / np.sum(np.exp(self.policy_params))
+        return np.random.choice(self.nr_actions, p=probs)
+
+    def update(self, state, action, reward, next_state, terminated, truncated):
+        next_action = self.policy(next_state)
+        td_error = reward + self.gamma * self.Q[next_action] - self.Q[action]
+        self.Q[action] += self.alpha * td_error
+        self.policy_params[action] += self.alpha * td_error  # Update policy parameters using the td_error
+
+
+
+class TDActorCriticAgent(ActorCriticAgent):
+    def update(self, state, action, reward, next_state, terminated, truncated):
+        next_action = self.policy(next_state)
+        td_target = reward if terminated else reward + self.gamma * self.Q[next_action]
+        td_error = td_target - self.Q[action]
+        self.Q[action] += self.alpha * td_error
+        self.policy_params[action] += self.alpha * td_error  # Policy update
+
+
+class TDLambdaActorCriticAgent(TDActorCriticAgent):
+    def __init__(self, params):
+        super().__init__(params)
+        self.lambda_ = params['lambda']  # Eligibility trace decay factor
+        self.eligibility_traces = np.zeros(self.nr_actions)  # Eligibility traces for each action
+
+    def update(self, state, action, reward, next_state, terminated, truncated):
+        self.eligibility_traces *= self.gamma * self.lambda_
+        self.eligibility_traces[action] += 1
+
+        next_action = self.policy(next_state)
+        td_target = reward if terminated else reward + self.gamma * self.Q[next_action]
+        td_error = td_target - self.Q[action]
+
+        self.Q += self.alpha * td_error * self.eligibility_traces
+        self.policy_params += self.alpha * td_error * self.eligibility_traces
+
+        if terminated:
+            self.eligibility_traces.fill(0)  # Reset traces at the end of the episode
+
+
