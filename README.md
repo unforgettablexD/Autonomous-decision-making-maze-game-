@@ -105,3 +105,8 @@ python compare.py <map-name>
 ![combined_agent_performance](https://github.com/unforgettablexD/Autonomous-decision-making-maze-game-/assets/49744841/2351c06b-1a05-4dc4-a8cd-996cd279509d)
 
 
+### Comparision with other models :
+![smoothed_discounted_return_comparison](https://github.com/unforgettablexD/Autonomous-decision-making-maze-game-/assets/49744841/80ea0d2c-fa10-4f30-af91-73b3da1077aa)
+
+
+
